@@ -8,6 +8,7 @@ const activitiesRouter = require('./activities');
 const logsRouter = require('./logs');
 const dashboardRouter = require('./dashboard');
 const reportsRouter = require('./reports');
+const privacyRouter = require('./privacy');
 const { requireAuth } = require('../middleware/auth');
 const { requireConsent } = require('../middleware/requireConsent');
 
@@ -22,5 +23,6 @@ router.use('/activities', requireAuth, activitiesRouter);
 router.use('/dashboard', requireAuth, dashboardRouter);
 router.use('/logs', requireAuth, requireConsent, logsRouter);
 router.use('/reports', requireAuth, requireConsent, reportsRouter);
+router.use('/privacy', requireAuth, privacyRouter);
 
 module.exports = router;

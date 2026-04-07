@@ -17,6 +17,7 @@
   --primary-dark: #0b5f66;
   --warning: #a55f00;
   --danger: #ac2b2b;
+  --success: #0b7a4f;
   --radius: 18px;
 }
 
@@ -37,6 +38,7 @@
   --primary-dark: #7ed9d2;
   --warning: #f0b562;
   --danger: #ff8f8f;
+  --success: #53d6a0;
 }
 
 * {
@@ -93,6 +95,14 @@ p {
 .hero-card ul {
   padding-left: 1.1rem;
   color: var(--muted);
+}
+
+.medical-disclaimer-inline {
+  margin-top: 0.85rem;
+  padding: 0.75rem;
+  border-left: 3px solid var(--warning);
+  background: color-mix(in srgb, var(--warning), transparent 92%);
+  border-radius: 8px;
 }
 
 .eyebrow {
@@ -280,6 +290,22 @@ textarea {
   font-weight: 600;
 }
 
+.success-text {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.consent-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.consent-check input {
+  margin-top: 0.2rem;
+}
+
 .stats-grid {
   margin-top: 0.7rem;
   display: grid;
@@ -332,6 +358,48 @@ progress {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 0.7rem;
+}
+
+.report-disclaimer {
+  margin-top: 0.55rem;
+  font-size: 0.82rem;
+  padding: 0.55rem;
+  border-left: 3px solid var(--warning);
+  background: color-mix(in srgb, var(--warning), transparent 93%);
+}
+
+.privacy-card {
+  margin-top: 1rem;
+}
+
+.privacy-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.danger-zone {
+  margin-top: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--danger), transparent 45%);
+  border-radius: 12px;
+  padding: 0.8rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.danger-btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 0.72rem 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #b33434, #d55a5a);
+}
+
+.danger-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .table-wrap {

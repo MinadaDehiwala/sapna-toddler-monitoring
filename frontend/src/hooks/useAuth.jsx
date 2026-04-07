@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut
@@ -49,6 +50,13 @@ export function AuthProvider({ children }) {
           return Promise.resolve();
         }
         return signOut(auth);
+      },
+      deleteCurrentUser: async () => {
+        if (!auth?.currentUser) {
+          return false;
+        }
+        await deleteUser(auth.currentUser);
+        return true;
       }
     }),
     [loading, user]

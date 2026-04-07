@@ -11,19 +11,25 @@ const successOptions = [
 ];
 
 export default function DashboardPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, deleteCurrentUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
 
   const [profile, setProfile] = useState(null);
   const [consent, setConsent] = useState(null);
+  const [consentForm, setConsentForm] = useState({
+    acknowledgedScreeningOnly: false,
+    acknowledgedDataUse: false
+  });
   const [children, setChildren] = useState([]);
   const [selectedChildId, setSelectedChildId] = useState('');
   const [activities, setActivities] = useState([]);
   const [logs, setLogs] = useState([]);
   const [dashboard, setDashboard] = useState(null);
   const [reports, setReports] = useState([]);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
 
   const [childForm, setChildForm] = useState({ nickname: '', dateOfBirth: '', sex: '' });
   const [logForm, setLogForm] = useState({
@@ -38,6 +44,10 @@ export default function DashboardPage() {
     () => children.find((item) => item._id === selectedChildId) || null,
     [children, selectedChildId]
   );
+  const requiresConsent =
+    !consent?.hasAcceptedConsent ||
+    !consent?.acknowledgedScreeningOnly ||
+    !consent?.acknowledgedDataUse;
 
   async function getToken() {
     return user.getIdToken();
@@ -50,6 +60,7 @@ export default function DashboardPage() {
 
   async function loadBaseData() {
     setError('');
+    setActionMessage('');
     setPending(true);
     try {
       const [profileData, consentData, childrenData] = await Promise.all([
@@ -60,6 +71,10 @@ export default function DashboardPage() {
 
       setProfile(profileData.parent);
       setConsent(consentData);
+      setConsentForm({
+        acknowledgedScreeningOnly: Boolean(consentData.acknowledgedScreeningOnly),
+        acknowledgedDataUse: Boolean(consentData.acknowledgedDataUse)
+      });
       setChildren(childrenData.children || []);
 
       if (!selectedChildId && childrenData.children?.length > 0) {
@@ -82,6 +97,7 @@ export default function DashboardPage() {
     }
 
     setError('');
+    setActionMessage('');
     try {
       const [activityData, logData, dashboardData, reportData] = await Promise.all([
         callApi(`/activities?childId=${childId}`),
@@ -114,11 +130,24 @@ export default function DashboardPage() {
   }, [selectedChildId]);
 
   async function handleConsentAccept() {
+    if (!consentForm.acknowledgedScreeningOnly || !consentForm.acknowledgedDataUse) {
+      setError('Please acknowledge both consent statements before continuing.');
+      return;
+    }
+
     setPending(true);
     setError('');
+    setActionMessage('');
     try {
-      const consentData = await callApi('/consent', { method: 'POST', body: {} });
+      const consentData = await callApi('/consent', {
+        method: 'POST',
+        body: {
+          acknowledgedScreeningOnly: true,
+          acknowledgedDataUse: true
+        }
+      });
       setConsent(consentData);
+      setActionMessage('Consent saved successfully.');
       await loadBaseData();
     } catch (consentError) {
       setError(consentError.message);
@@ -131,6 +160,7 @@ export default function DashboardPage() {
     event.preventDefault();
     setPending(true);
     setError('');
+    setActionMessage('');
     try {
       await callApi('/children', { method: 'POST', body: childForm });
       setChildForm({ nickname: '', dateOfBirth: '', sex: '' });
@@ -151,6 +181,7 @@ export default function DashboardPage() {
 
     setPending(true);
     setError('');
+    setActionMessage('');
 
     try {
       await callApi('/logs', {
@@ -181,15 +212,66 @@ export default function DashboardPage() {
 
     setPending(true);
     setError('');
+    setActionMessage('');
 
     try {
       await callApi('/reports/generate-weekly', {
         method: 'POST',
         body: { childId: selectedChildId }
       });
+      setActionMessage('Weekly report generated.');
       await loadChildData(selectedChildId);
     } catch (reportError) {
       setError(reportError.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleExportData() {
+    setPending(true);
+    setError('');
+    setActionMessage('');
+    try {
+      const exportPayload = await callApi('/privacy/export');
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
+        type: 'application/json'
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `sapna-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setActionMessage('Data export downloaded as JSON.');
+    } catch (exportError) {
+      setError(exportError.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setPending(true);
+    setError('');
+    setActionMessage('');
+    try {
+      await callApi('/privacy/account', {
+        method: 'DELETE',
+        body: { confirmationText: deleteConfirmationText }
+      });
+
+      try {
+        await deleteCurrentUser();
+      } catch (firebaseDeleteError) {
+        console.warn('Firebase account deletion could not be completed from browser session.', firebaseDeleteError);
+      }
+
+      await logout();
+    } catch (deleteError) {
+      setError(deleteError.message);
     } finally {
       setPending(false);
     }
@@ -214,19 +296,46 @@ export default function DashboardPage() {
       </header>
 
       {error && <section className="card error-text">{error}</section>}
+      {actionMessage && <section className="card success-text">{actionMessage}</section>}
 
       <section className="card disclaimer-card">
         <strong>Medical Disclaimer:</strong> This tool supports developmental screening and monitoring
         only. It does not provide a medical diagnosis.
       </section>
 
-      {!consent?.hasAcceptedConsent && (
+      {requiresConsent && (
         <section className="card consent-card">
           <h2>Parental Consent Required</h2>
           <p>
             Before storing any developmental logs, please confirm consent for parent-reported data
             collection and secure processing.
           </p>
+          <label className="consent-check">
+            <input
+              type="checkbox"
+              checked={consentForm.acknowledgedScreeningOnly}
+              onChange={(event) =>
+                setConsentForm((prev) => ({
+                  ...prev,
+                  acknowledgedScreeningOnly: event.target.checked
+                }))
+              }
+            />
+            I understand this is a screening and monitoring aid, not a medical diagnosis.
+          </label>
+          <label className="consent-check">
+            <input
+              type="checkbox"
+              checked={consentForm.acknowledgedDataUse}
+              onChange={(event) =>
+                setConsentForm((prev) => ({
+                  ...prev,
+                  acknowledgedDataUse: event.target.checked
+                }))
+              }
+            />
+            I consent to secure storage and processing of parent-reported interaction data.
+          </label>
           <button className="primary-btn" type="button" disabled={pending} onClick={handleConsentAccept}>
             I Accept Consent Terms
           </button>
@@ -297,7 +406,7 @@ export default function DashboardPage() {
             className="primary-btn"
             type="button"
             onClick={handleGenerateReport}
-            disabled={pending || !consent?.hasAcceptedConsent || !selectedChildId}
+            disabled={pending || requiresConsent || !selectedChildId}
           >
             Generate Weekly Report
           </button>
@@ -310,6 +419,7 @@ export default function DashboardPage() {
                   <strong>{new Date(report.weekStart).toLocaleDateString()}</strong> - {report.status}
                 </p>
                 <p>{report.summary}</p>
+                <p className="report-disclaimer">{report.reportDisclaimer}</p>
               </div>
             ))}
           </div>
@@ -393,7 +503,7 @@ export default function DashboardPage() {
             <button
               className="primary-btn"
               type="submit"
-              disabled={pending || !consent?.hasAcceptedConsent || !selectedChildId}
+              disabled={pending || requiresConsent || !selectedChildId}
             >
               Save Activity Log
             </button>
@@ -470,6 +580,37 @@ export default function DashboardPage() {
             </table>
           </div>
         )}
+      </section>
+
+      <section className="card privacy-card">
+        <h2>Privacy &amp; Data</h2>
+        <p>
+          You can export your account data at any time. Deleting your account permanently removes
+          parent, child, log, and report records from SAPNA.
+        </p>
+        <div className="privacy-actions">
+          <button className="secondary-btn" type="button" onClick={handleExportData} disabled={pending}>
+            Export My Data
+          </button>
+        </div>
+        <div className="danger-zone">
+          <label>
+            Type <strong>DELETE MY DATA</strong> to confirm permanent deletion
+            <input
+              value={deleteConfirmationText}
+              onChange={(event) => setDeleteConfirmationText(event.target.value)}
+              placeholder="DELETE MY DATA"
+            />
+          </label>
+          <button
+            className="danger-btn"
+            type="button"
+            onClick={handleDeleteAccount}
+            disabled={pending || deleteConfirmationText !== 'DELETE MY DATA'}
+          >
+            Delete My Account/Data
+          </button>
+        </div>
       </section>
     </main>
   );

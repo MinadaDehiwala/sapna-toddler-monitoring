@@ -1,7 +1,11 @@
 const createError = require('http-errors');
 
 function requireConsent(req, res, next) {
-  if (!req.user?.parent?.hasAcceptedConsent) {
+  if (
+    !req.user?.parent?.hasAcceptedConsent ||
+    !req.user?.parent?.consentAcknowledgedScreeningOnly ||
+    !req.user?.parent?.consentAcknowledgedDataUse
+  ) {
     return next(
       createError(
         403,

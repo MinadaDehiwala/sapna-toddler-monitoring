@@ -12,9 +12,11 @@ Parent-mediated toddler development monitoring platform aligned to the NSBM rese
 - Parent-first UX to reduce direct toddler screen exposure
 - Firebase Auth integration (email/password flow)
 - Secure parental consent gate before milestone logging
+- Explicit screening/data-use acknowledgments during consent
 - 12-36 month activity library with seeded offline interventions
 - Structured interaction logs and progress dashboard
 - Weekly rule-based screening summaries with risk flags
+- Parent privacy controls: JSON export + account/data deletion
 - Shared-EC2, isolated-domain deployment without impacting existing services
 
 ## Architecture
@@ -55,6 +57,9 @@ flowchart LR
   - domain breakdown
   - recommendations
   - non-diagnostic medical disclaimer
+- Privacy APIs:
+  - `GET /api/privacy/export`
+  - `DELETE /api/privacy/account` with `confirmationText: "DELETE MY DATA"`
 
 ## Quick Start (Local)
 
@@ -69,6 +74,12 @@ npm run seed:activities
 npm run dev
 ```
 
+Run automated API tests:
+
+```bash
+npm test
+```
+
 Backend default: `http://localhost:3010`
 
 ### 2. Frontend
@@ -78,6 +89,12 @@ cd frontend
 cp .env.example .env
 npm install
 npm run dev
+```
+
+Run automated UI smoke tests:
+
+```bash
+npm test
 ```
 
 Frontend default: `http://localhost:5173`  

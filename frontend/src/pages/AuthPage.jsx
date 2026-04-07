@@ -53,6 +53,10 @@ export default function AuthPage() {
           Track offline milestone activities, log developmental observations, and receive
           personalized weekly progress insights without increasing toddler screen exposure.
         </p>
+        <p className="medical-disclaimer-inline">
+          Medical Disclaimer: SAPNA is a screening and monitoring aid, not a medical diagnosis.
+          Always consult a qualified healthcare professional for formal assessment.
+        </p>
         <ul>
           <li>Guided activities mapped to 12-36 month milestones</li>
           <li>Consent-driven and parent-mediated data collection</li>

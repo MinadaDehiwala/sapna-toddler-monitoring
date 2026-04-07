@@ -10,6 +10,25 @@ const successOptions = [
   { value: 'mastered', label: 'Mastered' }
 ];
 
+const statusLabels = {
+  on_track: 'On Track',
+  needs_monitoring: 'Needs Monitoring',
+  at_risk: 'At Risk'
+};
+
+const predictionSourceLabels = {
+  ml: 'ML Screening',
+  rules_fallback: 'Rules Fallback'
+};
+
+function formatConfidence(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return 'N/A';
+  }
+  return `${Math.round(numeric * 100)}%`;
+}
+
 export default function DashboardPage() {
   const { user, logout, deleteCurrentUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -277,6 +296,63 @@ export default function DashboardPage() {
     }
   }
 
+  function renderReportCard(report, { compact = false } = {}) {
+    const probabilityEntries = Object.entries(report.classProbabilities || {});
+    const disclaimerText = report.reportDisclaimer || dashboard?.medicalDisclaimer;
+
+    return (
+      <div className="report-item" key={report._id}>
+        <div className="report-header-row">
+          <p>
+            <strong>{new Date(report.weekStart).toLocaleDateString()}</strong> -{' '}
+            {statusLabels[report.status] || report.status}
+          </p>
+          <span className={`source-badge source-${report.predictionSource || 'rules_fallback'}`}>
+            {predictionSourceLabels[report.predictionSource] || 'Rules Fallback'}
+          </span>
+        </div>
+        <p>{report.summary}</p>
+        <div className="report-meta-grid">
+          <div>
+            <span className="report-meta-label">Confidence</span>
+            <strong>{formatConfidence(report.predictionConfidence)}</strong>
+          </div>
+          <div>
+            <span className="report-meta-label">Model</span>
+            <strong>{report.modelVersion || 'sapna-rules-v1'}</strong>
+          </div>
+        </div>
+        {report.predictionSource === 'rules_fallback' && (
+          <p className="report-note">
+            This report used the rules fallback because the ML service was unavailable or below
+            the confidence threshold.
+          </p>
+        )}
+        {probabilityEntries.length > 0 && (
+          <div className="probability-grid">
+            {probabilityEntries.map(([label, value]) => (
+              <div className="probability-item" key={label}>
+                <span>{statusLabels[label] || label}</span>
+                <strong>{formatConfidence(value)}</strong>
+              </div>
+            ))}
+          </div>
+        )}
+        {report.topRiskFactors?.length > 0 && (
+          <div className="risk-factor-list">
+            <h4>{report.status === 'on_track' ? 'Positive Signals' : 'Top Risk Factors'}</h4>
+            <ul>
+              {report.topRiskFactors.map((factor) => (
+                <li key={factor}>{factor}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {!compact && disclaimerText && <p className="report-disclaimer">{disclaimerText}</p>}
+      </div>
+    );
+  }
+
   return (
     <main className="dashboard-shell">
       <header className="topbar card">
@@ -299,8 +375,9 @@ export default function DashboardPage() {
       {actionMessage && <section className="card success-text">{actionMessage}</section>}
 
       <section className="card disclaimer-card">
-        <strong>Medical Disclaimer:</strong> This tool supports developmental screening and monitoring
-        only. It does not provide a medical diagnosis.
+        <strong>Medical Disclaimer:</strong>{' '}
+        {dashboard?.medicalDisclaimer ||
+          'This tool supports developmental screening and monitoring only. It does not provide a medical diagnosis.'}
       </section>
 
       {requiresConsent && (
@@ -413,15 +490,7 @@ export default function DashboardPage() {
 
           <div className="report-list">
             {reports.length === 0 && <p>No reports generated yet.</p>}
-            {reports.map((report) => (
-              <div className="report-item" key={report._id}>
-                <p>
-                  <strong>{new Date(report.weekStart).toLocaleDateString()}</strong> - {report.status}
-                </p>
-                <p>{report.summary}</p>
-                <p className="report-disclaimer">{report.reportDisclaimer}</p>
-              </div>
-            ))}
+            {reports.map((report) => renderReportCard(report))}
           </div>
         </article>
       </section>
@@ -447,7 +516,7 @@ export default function DashboardPage() {
             </label>
 
             <label>
-              Duration (minutes)
+              Logged Duration (minutes)
               <input
                 type="number"
                 min="1"
@@ -539,10 +608,13 @@ export default function DashboardPage() {
               </div>
 
               {dashboard.latestReport && (
-                <div className="report-item">
+                <>
                   <h3>Latest Weekly Summary</h3>
-                  <p>{dashboard.latestReport.summary}</p>
-                </div>
+                  {renderReportCard(dashboard.latestReport, { compact: true })}
+                  <p className="report-disclaimer">
+                    {dashboard.latestReport.reportDisclaimer || dashboard.medicalDisclaimer}
+                  </p>
+                </>
               )}
             </>
           )}

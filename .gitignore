@@ -14,3 +14,9 @@ frontend/.env.*
 !frontend/.env.example
 
 *.log
+
+ml-service/.venv
+ml-service/.generated
+ml-service/__pycache__
+ml-service/.pytest_cache
+ml-service/**/*.pyc

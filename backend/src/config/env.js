@@ -19,7 +19,13 @@ const env = {
   firebaseClientEmail: process.env.FIREBASE_CLIENT_EMAIL,
   firebasePrivateKey: process.env.FIREBASE_PRIVATE_KEY
     ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : null
+    : null,
+  mlServiceEnabled: (process.env.ML_SERVICE_ENABLED || (process.env.NODE_ENV === 'production' ? 'true' : 'false')) === 'true',
+  mlServiceUrl: process.env.ML_SERVICE_URL || 'http://127.0.0.1:8010',
+  mlServiceTimeoutMs: Number(process.env.ML_SERVICE_TIMEOUT_MS || 1000),
+  mlHealthTimeoutMs: Number(process.env.ML_HEALTH_TIMEOUT_MS || 600),
+  mlConfidenceThreshold: Number(process.env.ML_CONFIDENCE_THRESHOLD || 0.55),
+  ruleEngineVersion: process.env.RULE_ENGINE_VERSION || 'sapna-rules-v1'
 };
 
 module.exports = { env };

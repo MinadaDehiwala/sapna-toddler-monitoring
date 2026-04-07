@@ -14,6 +14,11 @@ rsync -az --delete \
   --exclude 'backend/node_modules' \
   --exclude 'frontend/node_modules' \
   --exclude 'frontend/dist' \
+  --exclude 'ml-service/.venv' \
+  --exclude 'ml-service/.generated' \
+  --exclude 'ml-service/.pytest_cache' \
+  --exclude 'ml-service/__pycache__' \
+  --exclude 'ml-service/**/*.pyc' \
   --exclude '.git' \
   --exclude '.DS_Store' \
   "$LOCAL_ROOT/" "$EC2_HOST:$REMOTE_ROOT/"

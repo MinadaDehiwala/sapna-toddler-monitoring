@@ -1,6 +1,7 @@
 import request from 'supertest';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
+import { createRequire } from 'module';
 import { beforeAll, afterAll, beforeEach, describe, it, expect, vi } from 'vitest';
 
 process.env.NODE_ENV = 'test';
@@ -36,6 +37,8 @@ vi.mock('firebase-admin', () => {
   };
 });
 
+const require = createRequire(import.meta.url);
+const { env } = require('../src/config/env.js');
 const firebaseConfigModule = await import('../src/config/firebase.js');
 const appModule = await import('../src/app.js');
 
@@ -95,6 +98,13 @@ describe('API compliance and privacy flows', () => {
   });
 
   beforeEach(async () => {
+    env.mlServiceEnabled = false;
+    env.mlServiceUrl = 'http://127.0.0.1:8010';
+    env.mlServiceTimeoutMs = 1000;
+    env.mlHealthTimeoutMs = 600;
+    env.mlConfidenceThreshold = 0.55;
+    vi.unstubAllGlobals();
+
     await Promise.all([
       Parent.deleteMany({}),
       Child.deleteMany({}),
@@ -119,6 +129,7 @@ describe('API compliance and privacy flows', () => {
     const health = await request(app).get('/api/health');
     expect(health.status).toBe(200);
     expect(health.body.ok).toBe(true);
+    expect(health.body.mlServiceReachable).toBe(false);
 
     const me = await authRequest().get('/api/auth/me');
     expect(me.status).toBe(200);
@@ -244,5 +255,144 @@ describe('API compliance and privacy flows', () => {
 
     const blocked = await authRequest().get('/api/auth/me');
     expect(blocked.status).toBe(403);
+  });
+
+  it('uses the ML sidecar when prediction confidence is high', async () => {
+    env.mlServiceEnabled = true;
+    const fetchMock = vi.fn(async (url) => {
+      if (String(url).endsWith('/predict')) {
+        return {
+          ok: true,
+          json: async () => ({
+            status: 'at_risk',
+            confidence: 0.87,
+            classProbabilities: {
+              on_track: 0.05,
+              needs_monitoring: 0.08,
+              at_risk: 0.87
+            },
+            topRiskFactors: ['Language-focused activities appear below the expected range for this age.'],
+            modelName: 'hybrid_rf',
+            modelVersion: 'sapna-ml-test'
+          })
+        };
+      }
+
+      if (String(url).endsWith('/health')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            modelVersion: 'sapna-ml-test'
+          })
+        };
+      }
+
+      throw new Error(`Unexpected ML fetch: ${url}`);
+    });
+    globalThis.fetch = fetchMock;
+
+    const activity = await Activity.create({
+      code: 'TST_ACTIVITY_ML',
+      title: 'ML activity',
+      description: 'ML route fixture',
+      domain: 'language',
+      ageBandMinMonths: 12,
+      ageBandMaxMonths: 36,
+      estimatedMinutes: 12,
+      instructions: ['Test']
+    });
+
+    await authRequest().post('/api/consent').send({
+      acknowledgedScreeningOnly: true,
+      acknowledgedDataUse: true
+    });
+    const childRes = await authRequest().post('/api/children').send({
+      nickname: 'MLKid',
+      dateOfBirth: '2024-01-01'
+    });
+    const childId = childRes.body.child._id;
+
+    await authRequest().post('/api/logs').send({
+      childId,
+      activityId: String(activity._id),
+      durationMinutes: 9,
+      successLevel: 'needs_help',
+      parentConfidence: 2
+    });
+
+    const reportRes = await authRequest().post('/api/reports/generate-weekly').send({ childId });
+    expect(reportRes.status).toBe(201);
+    expect(fetchMock).toHaveBeenCalled();
+    expect(reportRes.body.report.predictionSource).toBe('ml');
+    expect(reportRes.body.report.modelVersion).toBe('sapna-ml-test');
+    expect(reportRes.body.report.topRiskFactors.length).toBeGreaterThan(0);
+
+    const healthRes = await request(app).get('/api/health');
+    expect(healthRes.status).toBe(200);
+    expect(healthRes.body.mlServiceReachable).toBe(true);
+    expect(healthRes.body.mlModelVersion).toBe('sapna-ml-test');
+  });
+
+  it('falls back to rules when ML confidence is too low', async () => {
+    env.mlServiceEnabled = true;
+    const fetchMock = vi.fn(async (url) => {
+      if (String(url).endsWith('/predict')) {
+        return {
+          ok: true,
+          json: async () => ({
+            status: 'at_risk',
+            confidence: 0.32,
+            classProbabilities: {
+              on_track: 0.08,
+              needs_monitoring: 0.6,
+              at_risk: 0.32
+            },
+            topRiskFactors: ['ML sidecar suggested low-confidence risk.'],
+            modelName: 'hybrid_rf',
+            modelVersion: 'sapna-ml-low-confidence'
+          })
+        };
+      }
+
+      throw new Error(`Unexpected ML fetch: ${url}`);
+    });
+    globalThis.fetch = fetchMock;
+
+    const activity = await Activity.create({
+      code: 'TST_ACTIVITY_FALLBACK',
+      title: 'Fallback activity',
+      description: 'Fallback route fixture',
+      domain: 'cognitive',
+      ageBandMinMonths: 12,
+      ageBandMaxMonths: 36,
+      estimatedMinutes: 10,
+      instructions: ['Test']
+    });
+
+    await authRequest().post('/api/consent').send({
+      acknowledgedScreeningOnly: true,
+      acknowledgedDataUse: true
+    });
+    const childRes = await authRequest().post('/api/children').send({
+      nickname: 'FallbackKid',
+      dateOfBirth: '2024-01-01'
+    });
+    const childId = childRes.body.child._id;
+
+    await authRequest().post('/api/logs').send({
+      childId,
+      activityId: String(activity._id),
+      durationMinutes: 11,
+      successLevel: 'completed',
+      parentConfidence: 4
+    });
+
+    const reportRes = await authRequest().post('/api/reports/generate-weekly').send({ childId });
+    expect(reportRes.status).toBe(201);
+    expect(fetchMock).toHaveBeenCalled();
+    expect(reportRes.body.report.predictionSource).toBe('rules_fallback');
+    expect(reportRes.body.report.classProbabilities.at_risk).toBeGreaterThan(0);
+    expect(reportRes.body.report.classProbabilities.needs_monitoring).toBeGreaterThan(0);
   });
 });

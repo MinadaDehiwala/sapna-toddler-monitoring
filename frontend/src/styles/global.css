@@ -360,6 +360,88 @@ progress {
   padding: 0.7rem;
 }
 
+.report-header-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.source-ml {
+  background: color-mix(in srgb, #2b8a3e, transparent 84%);
+  color: #1d6c2f;
+}
+
+.source-rules_fallback {
+  background: color-mix(in srgb, var(--warning), transparent 84%);
+  color: color-mix(in srgb, var(--text), var(--warning) 25%);
+}
+
+.report-meta-grid {
+  margin-top: 0.65rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.report-meta-label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.report-note {
+  margin-top: 0.65rem;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.probability-grid {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.probability-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.55rem;
+  display: grid;
+  gap: 0.18rem;
+}
+
+.probability-item span {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.risk-factor-list {
+  margin-top: 0.8rem;
+}
+
+.risk-factor-list h4 {
+  margin-bottom: 0.35rem;
+}
+
+.risk-factor-list ul {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
 .report-disclaimer {
   margin-top: 0.55rem;
   font-size: 0.82rem;
@@ -442,5 +524,10 @@ td {
     width: 100%;
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .probability-grid,
+  .report-meta-grid {
+    grid-template-columns: 1fr;
   }
 }

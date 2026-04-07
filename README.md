@@ -15,8 +15,9 @@ Parent-mediated toddler development monitoring platform aligned to the NSBM rese
 - Explicit screening/data-use acknowledgments during consent
 - 12-36 month activity library with seeded offline interventions
 - Structured interaction logs and progress dashboard
-- Weekly rule-based screening summaries with risk flags
+- Weekly screening summaries with ML prediction + rules fallback
 - Parent privacy controls: JSON export + account/data deletion
+- Proposal-aligned synthetic data generation, RF/SVM benchmarking, and compact deployed inference bundle
 - Shared-EC2, isolated-domain deployment without impacting existing services
 
 ## Architecture
@@ -27,6 +28,7 @@ flowchart LR
     B --> C["React SPA (static build)"]
     B --> D["Node/Express API (PM2 :3010)"]
     D --> E["MongoDB Atlas"]
+    D --> G["FastAPI ML Sidecar (127.0.0.1:8010)"]
     A --> F["Firebase Auth"]
     D --> F
 ```
@@ -35,6 +37,7 @@ flowchart LR
 
 - Frontend: React + Vite + Firebase Web SDK
 - Backend: Node.js + Express + Mongoose
+- ML Service: Python 3.9 + FastAPI + scikit-learn
 - Auth: Firebase ID tokens + backend verification
 - Database: MongoDB Atlas
 - Deployment: AWS EC2 + PM2 + Nginx + Let's Encrypt
@@ -54,6 +57,9 @@ flowchart LR
 - Dashboard analytics over recent logs
 - Weekly report generation:
   - status classification (`on_track`, `needs_monitoring`, `at_risk`)
+  - prediction source badge (`ML` or `Rules Fallback`)
+  - prediction confidence + class probabilities
+  - top risk/positive factors
   - domain breakdown
   - recommendations
   - non-diagnostic medical disclaimer
@@ -100,6 +106,52 @@ npm test
 Frontend default: `http://localhost:5173`  
 Vite proxies `/api` to `http://localhost:3010`.
 
+### 3. ML Service
+
+Create synthetic data, train all proposal-aligned models, run the ML test suite, and refresh the production artifact bundle:
+
+```bash
+cd ml-service
+./scripts/run_local_ml_pipeline.sh
+```
+
+Run the inference API locally:
+
+```bash
+cd ml-service
+source .venv/bin/activate
+uvicorn app.main:app --host 127.0.0.1 --port 8010
+```
+
+Run the ML-only automated tests:
+
+```bash
+cd ml-service
+source .venv/bin/activate
+pytest tests
+```
+
+The local production artifact bundle is written to:
+
+- `ml-service/artifacts/production/model.joblib`
+- `ml-service/artifacts/production/feature_schema.json`
+- `ml-service/artifacts/production/label_mapping.json`
+- `ml-service/artifacts/production/metrics.json`
+- `ml-service/artifacts/production/model_version.txt`
+
+Training reports are written to:
+
+- `ml-service/reports/training_metrics.json`
+- `ml-service/reports/training_report.md`
+
+Latest validated local training result:
+
+- Generated dataset: `19,997` child-week samples
+- Generated raw logs: `153,606`
+- Evaluated models: `random_forest`, `svm`, `hybrid_rf (PCA + RandomForest)`
+- Selected production model: `random_forest`
+- Holdout macro-F1: `0.9634`
+
 ## Firebase Setup
 
 Project used:
@@ -145,9 +197,13 @@ Script actions:
 
 - sync repo to `/home/ec2-user/sapna-toddler-monitoring`
 - install backend/frontend dependencies
-- restart PM2 app `sapna-toddler-api`
+- install/update ML sidecar virtualenv + requirements
+- restart PM2 apps `sapna-toddler-api` and `sapna-ml-api`
 - build and publish static frontend to `/var/www/sapna.minadadehiwala.com`
 - apply isolated nginx vhost + reload
+
+The ML service stays internal-only on EC2 and is not exposed through nginx.  
+Node calls it over `http://127.0.0.1:8010`.
 
 SSL setup:
 
@@ -160,9 +216,4 @@ bash deploy/enable-ssl.sh
 - This system is a screening/monitoring aid, not a clinical diagnosis.
 - Parents are directed to professional healthcare assessment for formal diagnosis.
 - Consent-first data collection and controlled parent ownership of logs.
-
-## Next Phase
-
-- Hybrid ML risk model training and inference service
-- Advanced longitudinal trend modeling
-- Expanded activity recommendation personalization
+- Production ML always keeps a transparent rules fallback when the sidecar is unavailable or not confident enough.

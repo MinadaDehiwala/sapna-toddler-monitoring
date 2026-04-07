@@ -15,6 +15,20 @@ const WeeklyReportSchema = new mongoose.Schema(
     summary: { type: String, required: true },
     recommendations: [{ type: String, trim: true }],
     riskFlags: [{ type: String, trim: true }],
+    topRiskFactors: [{ type: String, trim: true }],
+    predictionSource: {
+      type: String,
+      enum: ['ml', 'rules_fallback'],
+      default: 'rules_fallback',
+      required: true
+    },
+    predictionConfidence: { type: Number, default: 0 },
+    modelVersion: { type: String, default: 'sapna-rules-v1' },
+    classProbabilities: {
+      on_track: { type: Number, default: 0 },
+      needs_monitoring: { type: Number, default: 0 },
+      at_risk: { type: Number, default: 0 }
+    },
     domainBreakdown: {
       cognitive: { type: Number, default: 0 },
       motor: { type: Number, default: 0 },

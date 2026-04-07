@@ -5,6 +5,7 @@ const WeeklyReport = require('../models/WeeklyReport');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { getChildForParent } = require('../utils/ownership');
 const { calculateAgeInMonths, getAgeWarning } = require('../utils/age');
+const { env } = require('../config/env');
 
 const router = express.Router();
 
@@ -65,8 +66,7 @@ router.get(
         successCounts
       },
       latestReport,
-      medicalDisclaimer:
-        'This dashboard supports developmental screening and monitoring only. It is not a medical diagnosis.'
+      medicalDisclaimer: env.reportDisclaimer
     });
   })
 );

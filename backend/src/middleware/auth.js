@@ -32,7 +32,6 @@ async function requireAuth(req, res, next) {
       {
         $setOnInsert: {
           firebaseUid: decoded.uid,
-          email: decoded.email || '',
           displayName: decoded.name || ''
         },
         $set: {

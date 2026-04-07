@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../hooks/useTheme';
 
 export default function AuthPage() {
   const { login, signup, configError } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [mode, setMode] = useState('login');
   const [form, setForm] = useState({ email: '', password: '', confirmPassword: '' });
   const [pending, setPending] = useState(false);
@@ -38,6 +40,12 @@ export default function AuthPage() {
 
   return (
     <main className="app-shell auth-shell">
+      <section className="theme-row auth-theme-row">
+        <button className="theme-toggle-btn" type="button" onClick={toggleTheme}>
+          {theme === 'dark' ? 'Switch To Light' : 'Switch To Dark'}
+        </button>
+      </section>
+
       <section className="hero-card">
         <p className="eyebrow">Parent-Centric Monitoring</p>
         <h1>SAPNA Toddler Development Dashboard</h1>

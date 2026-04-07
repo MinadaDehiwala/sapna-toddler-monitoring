@@ -7,11 +7,36 @@
   --muted: #526377;
   --card: rgba(255, 255, 255, 0.92);
   --line: #d4dde8;
+  --surface-2: #e9f2fb;
+  --surface-3: #ecf3fb;
+  --input-bg: #ffffff;
+  --auth-pill-active: #ffffff;
+  --shadow: 0 18px 30px rgba(24, 34, 47, 0.07);
+  --progress-accent: #0f8b8d;
   --primary: #0f8b8d;
   --primary-dark: #0b5f66;
   --warning: #a55f00;
   --danger: #ac2b2b;
   --radius: 18px;
+}
+
+:root[data-theme='dark'] {
+  --bg: #0e141c;
+  --bg-accent: #18222f;
+  --ink: #e8eef7;
+  --muted: #b2c0d1;
+  --card: rgba(20, 30, 42, 0.92);
+  --line: #2e3f55;
+  --surface-2: #1c2a3b;
+  --surface-3: #243347;
+  --input-bg: #152131;
+  --auth-pill-active: #203145;
+  --shadow: 0 20px 36px rgba(0, 0, 0, 0.3);
+  --progress-accent: #38b9b0;
+  --primary: #39a4a7;
+  --primary-dark: #7ed9d2;
+  --warning: #f0b562;
+  --danger: #ff8f8f;
 }
 
 * {
@@ -24,8 +49,8 @@ body {
   font-family: 'Manrope', 'Segoe UI', sans-serif;
   color: var(--ink);
   background:
-    radial-gradient(circle at top right, #bde9db 0%, transparent 30%),
-    radial-gradient(circle at left bottom, #d6e7ff 0%, transparent 35%),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--bg-accent), white 15%) 0%, transparent 30%),
+    radial-gradient(circle at left bottom, color-mix(in srgb, var(--bg-accent), #8bb5ff 18%) 0%, transparent 35%),
     var(--bg);
 }
 
@@ -83,7 +108,7 @@ p {
   border-radius: var(--radius);
   border: 1px solid var(--line);
   padding: 1rem;
-  box-shadow: 0 18px 30px rgba(24, 34, 47, 0.07);
+  box-shadow: var(--shadow);
 }
 
 .auth-card {
@@ -95,7 +120,7 @@ p {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.35rem;
-  background: #e9f2fb;
+  background: var(--surface-2);
   border-radius: 999px;
   padding: 0.25rem;
   margin-bottom: 1rem;
@@ -111,9 +136,9 @@ p {
 }
 
 .auth-toggle button.active {
-  background: #fff;
+  background: var(--auth-pill-active);
   color: var(--ink);
-  box-shadow: 0 6px 10px rgba(34, 50, 70, 0.08);
+  box-shadow: 0 6px 10px rgba(34, 50, 70, 0.18);
 }
 
 .form-grid {
@@ -142,7 +167,7 @@ textarea {
   border-radius: 12px;
   padding: 0.65rem 0.75rem;
   color: var(--ink);
-  background: #fff;
+  background: var(--input-bg);
 }
 
 textarea {
@@ -169,8 +194,34 @@ textarea {
 }
 
 .secondary-btn {
-  background: #ecf3fb;
+  background: var(--surface-3);
   color: var(--ink);
+}
+
+.theme-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.auth-theme-row {
+  grid-column: 1 / -1;
+  margin-bottom: -0.4rem;
+}
+
+.theme-toggle-btn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  background: var(--surface-3);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
 }
 
 .topbar {
@@ -208,7 +259,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0.4rem 0.8rem;
-  background: #fff;
+  background: var(--input-bg);
   cursor: pointer;
 }
 
@@ -268,6 +319,7 @@ textarea {
 progress {
   width: 100%;
   height: 9px;
+  accent-color: var(--progress-accent);
 }
 
 .report-list {
@@ -316,5 +368,11 @@ td {
   .topbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }

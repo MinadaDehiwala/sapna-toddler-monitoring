@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../hooks/useTheme';
 
 const successOptions = [
   { value: 'needs_help', label: 'Needs Help' },
@@ -11,6 +12,7 @@ const successOptions = [
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
 
@@ -201,9 +203,14 @@ export default function DashboardPage() {
           <h1>SAPNA Monitoring Dashboard</h1>
           <p>{profile?.email || user?.email}</p>
         </div>
-        <button className="secondary-btn" type="button" onClick={logout}>
-          Logout
-        </button>
+        <div className="topbar-actions">
+          <button className="theme-toggle-btn" type="button" onClick={toggleTheme}>
+            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          </button>
+          <button className="secondary-btn" type="button" onClick={logout}>
+            Logout
+          </button>
+        </div>
       </header>
 
       {error && <section className="card error-text">{error}</section>}

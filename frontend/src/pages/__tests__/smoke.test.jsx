@@ -58,6 +58,14 @@ function buildDashboardApiMock({ consentAccepted }) {
   };
 
   return async (path, { method = 'GET' } = {}) => {
+    if (path === '/health') {
+      return {
+        ok: true,
+        mlServiceReachable: true,
+        mlModelVersion: 'sapna-ml-test',
+        mlServiceEnabled: true
+      };
+    }
     if (path === '/auth/me') {
       return { parent: { email: 'main@example.com' } };
     }
@@ -204,6 +212,8 @@ describe('frontend smoke flows', () => {
 
     const disclaimerMatches = await screen.findAllByText(/Medical Disclaimer:/i);
     expect(disclaimerMatches.length).toBeGreaterThan(0);
+    expect(await screen.findByText(/Model Online/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/sapna-ml-test/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Screening only. Not a diagnosis./i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/ML Screening/i).length).toBeGreaterThan(0);
     expect(

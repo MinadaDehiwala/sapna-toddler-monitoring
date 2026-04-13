@@ -48,6 +48,7 @@ export default function DashboardPage() {
   const [logs, setLogs] = useState([]);
   const [dashboard, setDashboard] = useState(null);
   const [reports, setReports] = useState([]);
+  const [mlHealth, setMlHealth] = useState(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
 
   const [childForm, setChildForm] = useState({ nickname: '', dateOfBirth: '', sex: '' });
@@ -75,6 +76,19 @@ export default function DashboardPage() {
   async function callApi(path, options = {}) {
     const token = await getToken();
     return apiRequest(path, { ...options, token });
+  }
+
+  async function loadMlHealth() {
+    try {
+      const healthData = await apiRequest('/health');
+      setMlHealth(healthData);
+    } catch {
+      setMlHealth({
+        mlServiceReachable: false,
+        mlModelVersion: null,
+        mlServiceEnabled: false
+      });
+    }
   }
 
   async function loadBaseData() {
@@ -139,6 +153,7 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
+    loadMlHealth();
     loadBaseData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -378,6 +393,29 @@ export default function DashboardPage() {
         <strong>Medical Disclaimer:</strong>{' '}
         {dashboard?.medicalDisclaimer ||
           'This tool supports developmental screening and monitoring only. It does not provide a medical diagnosis.'}
+      </section>
+
+      <section className="card ml-status-card">
+        <div>
+          <p className="eyebrow">ML Screening Engine</p>
+          <h2>{mlHealth?.mlServiceReachable ? 'Model Online' : 'Rules Fallback Active'}</h2>
+          <p>
+            Weekly reports use the deployed ML model when confidence is high enough, then fall
+            back to the transparent rules engine when needed.
+          </p>
+        </div>
+        <div className="ml-status-pill-wrap">
+          <span
+            className={`ml-status-pill ${
+              mlHealth?.mlServiceReachable ? 'ml-status-online' : 'ml-status-fallback'
+            }`}
+          >
+            {mlHealth?.mlServiceReachable ? 'ML Online' : 'Fallback Ready'}
+          </span>
+          <span className="ml-version-text">
+            {mlHealth?.mlModelVersion || 'Model version checking...'}
+          </span>
+        </div>
       </section>
 
       {requiresConsent && (

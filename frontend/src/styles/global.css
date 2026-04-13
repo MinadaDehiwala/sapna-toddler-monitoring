@@ -253,6 +253,58 @@ textarea {
   border-left: 4px solid var(--warning);
 }
 
+.ml-status-card {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-left: 4px solid var(--primary);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--primary), transparent 90%), transparent 55%),
+    var(--card);
+}
+
+.ml-status-card h2 {
+  margin-top: 0.2rem;
+}
+
+.ml-status-card p {
+  margin-bottom: 0;
+}
+
+.ml-status-pill-wrap {
+  min-width: 210px;
+  display: grid;
+  justify-items: end;
+  gap: 0.35rem;
+}
+
+.ml-status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  font-weight: 800;
+  border: 1px solid var(--line);
+}
+
+.ml-status-online {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success), transparent 88%);
+}
+
+.ml-status-fallback {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning), transparent 88%);
+}
+
+.ml-version-text {
+  color: var(--muted);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
 .consent-card {
   margin-top: 1rem;
   border-left: 4px solid var(--primary);
@@ -520,10 +572,20 @@ td {
     align-items: flex-start;
   }
 
+  .ml-status-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .topbar-actions {
     width: 100%;
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .ml-status-pill-wrap {
+    justify-items: start;
+    min-width: 0;
   }
 
   .probability-grid,

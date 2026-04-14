@@ -62,6 +62,11 @@ async function requireAuth(req, res, next) {
       await parent.save();
     }
 
+    if (!parent.role) {
+      parent.role = 'parent';
+      await parent.save();
+    }
+
     req.user = {
       uid: decoded.uid,
       email: decoded.email || '',

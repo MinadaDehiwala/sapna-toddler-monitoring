@@ -165,7 +165,7 @@ const ACTIVITY_SEED = [
   }
 ];
 
-async function seedActivities() {
+async function seedActivities({ shouldExit = true } = {}) {
   initializeFirebase();
   await connectMongo();
 
@@ -179,10 +179,16 @@ async function seedActivities() {
 
   const total = await Activity.countDocuments();
   console.log(`Activity seed completed. Total activities: ${total}`);
-  process.exit(0);
+  if (shouldExit) {
+    process.exit(0);
+  }
 }
 
-seedActivities().catch((error) => {
-  console.error('Failed to seed activities', error);
-  process.exit(1);
-});
+if (require.main === module) {
+  seedActivities().catch((error) => {
+    console.error('Failed to seed activities', error);
+    process.exit(1);
+  });
+}
+
+module.exports = { ACTIVITY_SEED, seedActivities };

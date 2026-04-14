@@ -5,6 +5,7 @@ const ParentSchema = new mongoose.Schema(
     firebaseUid: { type: String, required: true, unique: true, index: true },
     email: { type: String, required: true, lowercase: true, trim: true },
     displayName: { type: String, trim: true, default: '' },
+    role: { type: String, enum: ['parent', 'admin'], default: 'parent', index: true },
     hasAcceptedConsent: { type: Boolean, default: false },
     consentAcceptedAt: { type: Date, default: null },
     consentAcknowledgedScreeningOnly: { type: Boolean, default: false },

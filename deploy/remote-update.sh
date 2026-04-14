@@ -44,8 +44,12 @@ pm2 startOrReload ecosystem.config.cjs --only sapna-ml-api
 pm2 save
 
 cd "$APP_ROOT/frontend"
-npm ci
-npm run build
+if [[ -f dist/index.html ]]; then
+  echo "Using synced local frontend build"
+else
+  npm ci
+  npm run build
+fi
 
 sudo mkdir -p "$WWW_ROOT"
 sudo rsync -a --delete dist/ "$WWW_ROOT/"

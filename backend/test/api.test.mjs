@@ -9,7 +9,8 @@ process.env.FIREBASE_PROJECT_ID = 'test-project-id';
 
 const tokenToPayload = {
   'token-main': { uid: 'uid-main', email: 'main@example.com', name: 'Main Parent' },
-  'token-alt': { uid: 'uid-alt', email: 'alt@example.com', name: 'Alt Parent' }
+  'token-alt': { uid: 'uid-alt', email: 'alt@example.com', name: 'Alt Parent' },
+  'token-admin': { uid: 'uid-admin', email: 'admin@gmail.com', name: 'Admin Parent' }
 };
 
 vi.mock('firebase-admin', () => {
@@ -74,6 +75,7 @@ const Consent = mongoose.model('Consent');
 const ActivityLog = mongoose.model('ActivityLog');
 const WeeklyReport = mongoose.model('WeeklyReport');
 const DeletedAccount = mongoose.model('DeletedAccount');
+const { seedDemoForEmail } = require('../src/scripts/seedDemo.js');
 
 let mongoServer;
 
@@ -134,6 +136,125 @@ describe('API compliance and privacy flows', () => {
     const me = await authRequest().get('/api/auth/me');
     expect(me.status).toBe(200);
     expect(me.body.parent.email).toBe('main@example.com');
+    expect(me.body.parent.role).toBe('parent');
+  });
+
+  it('defaults parents to parent role and blocks non-admin admin APIs', async () => {
+    const me = await authRequest().get('/api/auth/me');
+    expect(me.status).toBe(200);
+    expect(me.body.parent.role).toBe('parent');
+
+    const blocked = await authRequest().get('/api/admin/summary');
+    expect(blocked.status).toBe(403);
+  });
+
+  it('allows admin users to inspect and manage parent records safely', async () => {
+    await authRequest().get('/api/auth/me');
+    await authRequest('token-admin').get('/api/auth/me');
+    await Parent.updateOne({ firebaseUid: 'uid-admin' }, { $set: { role: 'admin' } });
+
+    const parent = await Parent.findOne({ firebaseUid: 'uid-main' });
+    const activity = await Activity.create({
+      code: 'TST_ADMIN_ACTIVITY',
+      title: 'Admin activity',
+      description: 'Admin route fixture',
+      domain: 'motor',
+      ageBandMinMonths: 12,
+      ageBandMaxMonths: 36,
+      estimatedMinutes: 10,
+      instructions: ['Test']
+    });
+    const child = await Child.create({
+      parentId: parent._id,
+      nickname: 'AdminKid',
+      dateOfBirth: '2024-01-01'
+    });
+    const log = await ActivityLog.create({
+      parentId: parent._id,
+      childId: child._id,
+      activityId: activity._id,
+      completedAt: new Date('2026-04-01T00:00:00.000Z'),
+      durationMinutes: 10,
+      successLevel: 'completed',
+      parentConfidence: 4
+    });
+    const report = await WeeklyReport.create({
+      parentId: parent._id,
+      childId: child._id,
+      weekStart: new Date('2026-03-30T00:00:00.000Z'),
+      weekEnd: new Date('2026-04-05T23:59:59.999Z'),
+      status: 'on_track',
+      summary: 'Admin report fixture',
+      reportDisclaimer: 'Screening only.'
+    });
+
+    const summary = await authRequest('token-admin').get('/api/admin/summary');
+    expect(summary.status).toBe(200);
+    expect(summary.body.summary.parents).toBe(2);
+    expect(summary.body.summary.children).toBe(1);
+
+    const list = await authRequest('token-admin').get('/api/admin/parents?query=main&limit=10&page=1');
+    expect(list.status).toBe(200);
+    expect(list.body.parents[0].email).toBe('main@example.com');
+    expect(list.body.parents[0].counts.logs).toBe(1);
+
+    const detail = await authRequest('token-admin').get(`/api/admin/parents/${parent._id}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.children.length).toBe(1);
+    expect(detail.body.logs.length).toBe(1);
+    expect(detail.body.reports.length).toBe(1);
+
+    const roleUpdate = await authRequest('token-admin')
+      .patch(`/api/admin/parents/${parent._id}`)
+      .send({ role: 'admin', displayName: 'Managed Parent' });
+    expect(roleUpdate.status).toBe(200);
+    expect(roleUpdate.body.parent.role).toBe('admin');
+    expect(roleUpdate.body.parent.displayName).toBe('Managed Parent');
+
+    const badDelete = await authRequest('token-admin')
+      .del(`/api/admin/parents/${parent._id}/data`)
+      .send({ confirmationText: 'DELETE' });
+    expect(badDelete.status).toBe(400);
+
+    const deleteLog = await authRequest('token-admin')
+      .del(`/api/admin/logs/${log._id}`)
+      .send({ confirmationText: 'DELETE LOG' });
+    expect(deleteLog.status).toBe(200);
+
+    const deleteReport = await authRequest('token-admin')
+      .del(`/api/admin/reports/${report._id}`)
+      .send({ confirmationText: 'DELETE REPORT' });
+    expect(deleteReport.status).toBe(200);
+
+    const deleteChild = await authRequest('token-admin')
+      .del(`/api/admin/children/${child._id}`)
+      .send({ confirmationText: 'DELETE CHILD DATA' });
+    expect(deleteChild.status).toBe(200);
+
+    const parentAfterResourceDeletes = await Parent.findById(parent._id);
+    expect(parentAfterResourceDeletes).toBeTruthy();
+
+    const deleteAppData = await authRequest('token-admin')
+      .del(`/api/admin/parents/${parent._id}/data`)
+      .send({ confirmationText: 'DELETE USER DATA' });
+    expect(deleteAppData.status).toBe(200);
+    expect(deleteAppData.body.deleted).toBe(true);
+    expect(await Parent.findById(parent._id)).toBeTruthy();
+  });
+
+  it('prevents demoting the only admin account', async () => {
+    await authRequest('token-admin').get('/api/auth/me');
+    const admin = await Parent.findOneAndUpdate(
+      { firebaseUid: 'uid-admin' },
+      { $set: { role: 'admin' } },
+      { new: true }
+    );
+
+    const demote = await authRequest('token-admin')
+      .patch(`/api/admin/parents/${admin._id}`)
+      .send({ role: 'parent' });
+    expect(demote.status).toBe(400);
+    expect(demote.body.error.message).toContain('Cannot demote the only admin');
   });
 
   it('rejects consent capture when required acknowledgments are missing', async () => {
@@ -255,6 +376,46 @@ describe('API compliance and privacy flows', () => {
 
     const blocked = await authRequest().get('/api/auth/me');
     expect(blocked.status).toBe(403);
+  });
+
+  it('resets and recreates deterministic demo data for test1@gmail.com', async () => {
+    const parent = await Parent.create({
+      firebaseUid: 'uid-demo',
+      email: 'test1@gmail.com',
+      displayName: '',
+      role: 'parent'
+    });
+    await Child.create({
+      parentId: parent._id,
+      nickname: 'Stale child',
+      dateOfBirth: '2024-01-01'
+    });
+
+    const referenceDate = new Date('2026-04-13T12:00:00.000Z');
+    const first = await seedDemoForEmail({
+      email: 'test1@gmail.com',
+      shouldReset: true,
+      referenceDate
+    });
+    expect(first.counts).toEqual({ children: 3, logs: 134, reports: 24, consents: 1 });
+    expect(await Child.findOne({ parentId: parent._id, nickname: 'Stale child' })).toBeNull();
+
+    const children = await Child.find({ parentId: parent._id }).sort({ nickname: 1 }).lean();
+    expect(children.map((child) => child.nickname)).toEqual(['Ari', 'Kavi', 'Nila']);
+    expect(await Activity.countDocuments()).toBeGreaterThanOrEqual(16);
+
+    const second = await seedDemoForEmail({
+      email: 'test1@gmail.com',
+      shouldReset: true,
+      referenceDate
+    });
+    expect(second.counts).toEqual(first.counts);
+
+    const refreshedParent = await Parent.findById(parent._id).lean();
+    expect(refreshedParent.role).toBe('parent');
+    expect(refreshedParent.hasAcceptedConsent).toBe(true);
+    expect(refreshedParent.consentAcknowledgedScreeningOnly).toBe(true);
+    expect(refreshedParent.consentAcknowledgedDataUse).toBe(true);
   });
 
   it('uses the ML sidecar when prediction confidence is high', async () => {

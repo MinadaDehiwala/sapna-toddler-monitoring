@@ -8,6 +8,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "seed:activities": "node src/scripts/seedActivities.js",
+    "seed:demo": "node src/scripts/seedDemo.js",
+    "admin:grant": "node src/scripts/adminGrant.js",
     "check": "node src/scripts/runChecks.js",
     "test": "vitest run"
   },

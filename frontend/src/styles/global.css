@@ -241,11 +241,46 @@ textarea {
   gap: 1rem;
 }
 
+.tab-nav {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  position: sticky;
+  top: 0.75rem;
+  z-index: 5;
+  backdrop-filter: blur(12px);
+}
+
+.tab-button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.58rem 0.9rem;
+  background: var(--surface-3);
+  color: var(--muted);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tab-button-active {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, var(--primary), #18b9a5);
+  color: #fff;
+}
+
+.tab-panel {
+  margin-top: 1rem;
+}
+
 .grid.two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
   margin-top: 1rem;
+}
+
+.wide-card {
+  grid-column: 1 / -1;
 }
 
 .disclaimer-card {
@@ -437,7 +472,7 @@ progress {
 
 .source-rules_fallback {
   background: color-mix(in srgb, var(--warning), transparent 84%);
-  color: color-mix(in srgb, var(--text), var(--warning) 25%);
+  color: color-mix(in srgb, var(--ink), var(--warning) 25%);
 }
 
 .report-meta-grid {
@@ -536,6 +571,100 @@ progress {
   cursor: not-allowed;
 }
 
+.mini-list-item,
+.admin-resource-row {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.65rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.55rem;
+}
+
+.mini-list-item {
+  display: grid;
+  justify-content: stretch;
+}
+
+.mini-list-item span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.report-action-card,
+.settings-row,
+.admin-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.settings-row {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.8rem;
+}
+
+.profile-meta-card p {
+  margin: 0.55rem 0;
+}
+
+.admin-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-stats-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-search {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.55rem;
+}
+
+.admin-parent-list {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.admin-parent-row {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.7rem;
+  background: var(--input-bg);
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.admin-parent-row span:last-child {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.admin-detail {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.danger-link {
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -583,13 +712,30 @@ td {
     flex-wrap: wrap;
   }
 
+  .tab-nav {
+    position: static;
+  }
+
   .ml-status-pill-wrap {
     justify-items: start;
     min-width: 0;
   }
 
   .probability-grid,
-  .report-meta-grid {
+  .report-meta-grid,
+  .admin-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-action-card,
+  .settings-row,
+  .admin-header-row,
+  .admin-resource-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-search {
     grid-template-columns: 1fr;
   }
 }

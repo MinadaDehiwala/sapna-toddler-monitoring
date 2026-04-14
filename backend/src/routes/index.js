@@ -9,8 +9,10 @@ const logsRouter = require('./logs');
 const dashboardRouter = require('./dashboard');
 const reportsRouter = require('./reports');
 const privacyRouter = require('./privacy');
+const adminRouter = require('./admin');
 const { requireAuth } = require('../middleware/auth');
 const { requireConsent } = require('../middleware/requireConsent');
+const { requireAdmin } = require('../middleware/requireAdmin');
 
 const router = express.Router();
 
@@ -24,5 +26,6 @@ router.use('/dashboard', requireAuth, dashboardRouter);
 router.use('/logs', requireAuth, requireConsent, logsRouter);
 router.use('/reports', requireAuth, requireConsent, reportsRouter);
 router.use('/privacy', requireAuth, privacyRouter);
+router.use('/admin', requireAuth, requireAdmin, adminRouter);
 
 module.exports = router;

@@ -66,6 +66,12 @@ flowchart LR
 - Privacy APIs:
   - `GET /api/privacy/export`
   - `DELETE /api/privacy/account` with `confirmationText: "DELETE MY DATA"`
+- Tabbed product workspace:
+  - Overview, Children, Reports, Profile, Settings, About, Admin
+- Mongo-backed admin roles:
+  - `parent` default role
+  - `admin` privileged role for SAPNA app-data management
+  - destructive admin actions require exact confirmation text
 
 ## Quick Start (Local)
 
@@ -87,6 +93,15 @@ npm test
 ```
 
 Backend default: `http://localhost:3010`
+
+Admin/demo helpers:
+
+```bash
+npm run admin:grant -- --email admin@gmail.com
+npm run seed:demo -- --email test1@gmail.com --reset
+```
+
+Both accounts must log in once first so SAPNA has their Firebase-linked parent records.
 
 ### 2. Frontend
 

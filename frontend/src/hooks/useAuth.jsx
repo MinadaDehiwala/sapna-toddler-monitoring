@@ -3,6 +3,7 @@ import {
   createUserWithEmailAndPassword,
   deleteUser,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut
 } from 'firebase/auth';
@@ -44,6 +45,15 @@ export function AuthProvider({ children }) {
           throw new Error(firebaseConfigError || 'Firebase auth is unavailable.');
         }
         return createUserWithEmailAndPassword(auth, email, password);
+      },
+      resetPassword: (email) => {
+        if (!auth) {
+          throw new Error(firebaseConfigError || 'Firebase auth is unavailable.');
+        }
+        if (!email) {
+          throw new Error('No email address is available for this account.');
+        }
+        return sendPasswordResetEmail(auth, email);
       },
       logout: () => {
         if (!auth) {

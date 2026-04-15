@@ -316,6 +316,82 @@ describe('API compliance and privacy flows', () => {
     expect(reportRes.body.report.reportDisclaimer).toBeTruthy();
   });
 
+  it('lets parents update child profiles and delete owned logs or child data with confirmation', async () => {
+    const activity = await Activity.create({
+      code: 'TST_ACTIVITY_MANAGE',
+      title: 'Manage activity',
+      description: 'Management fixture',
+      domain: 'motor',
+      ageBandMinMonths: 12,
+      ageBandMaxMonths: 36,
+      estimatedMinutes: 10,
+      instructions: ['Test']
+    });
+
+    await authRequest().post('/api/consent').send({
+      acknowledgedScreeningOnly: true,
+      acknowledgedDataUse: true
+    });
+
+    const childRes = await authRequest().post('/api/children').send({
+      nickname: 'ManageKid',
+      dateOfBirth: '2024-01-01',
+      sex: 'other'
+    });
+    const childId = childRes.body.child._id;
+
+    const updateChild = await authRequest().patch(`/api/children/${childId}`).send({
+      nickname: 'ManageKid Updated',
+      sex: 'female'
+    });
+    expect(updateChild.status).toBe(200);
+    expect(updateChild.body.child.nickname).toBe('ManageKid Updated');
+    expect(updateChild.body.child.sex).toBe('female');
+
+    const logRes = await authRequest().post('/api/logs').send({
+      childId,
+      activityId: String(activity._id),
+      durationMinutes: 10,
+      successLevel: 'completed',
+      parentConfidence: 4
+    });
+    const logId = logRes.body.log._id;
+
+    const badLogDelete = await authRequest().del(`/api/logs/${logId}`).send({
+      confirmationText: 'DELETE'
+    });
+    expect(badLogDelete.status).toBe(400);
+
+    const logDelete = await authRequest().del(`/api/logs/${logId}`).send({
+      confirmationText: 'DELETE LOG'
+    });
+    expect(logDelete.status).toBe(200);
+    expect(await ActivityLog.countDocuments({ _id: logId })).toBe(0);
+
+    await authRequest().post('/api/logs').send({
+      childId,
+      activityId: String(activity._id),
+      durationMinutes: 12,
+      successLevel: 'partial',
+      parentConfidence: 3
+    });
+    await authRequest().post('/api/reports/generate-weekly').send({ childId });
+
+    const badChildDelete = await authRequest().del(`/api/children/${childId}`).send({
+      confirmationText: 'DELETE'
+    });
+    expect(badChildDelete.status).toBe(400);
+
+    const childDelete = await authRequest().del(`/api/children/${childId}`).send({
+      confirmationText: 'DELETE CHILD DATA'
+    });
+    expect(childDelete.status).toBe(200);
+    expect(childDelete.body.deletedCounts.children).toBe(1);
+    expect(await Child.countDocuments({ _id: childId })).toBe(0);
+    expect(await ActivityLog.countDocuments({ childId })).toBe(0);
+    expect(await WeeklyReport.countDocuments({ childId })).toBe(0);
+  });
+
   it('returns a complete export package and supports hard account deletion', async () => {
     const activity = await Activity.create({
       code: 'TST_ACTIVITY_EXPORT',

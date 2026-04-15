@@ -547,6 +547,105 @@ progress {
   margin-top: 0.5rem;
 }
 
+.quick-actions-card {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.quick-actions,
+.next-action-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.compact-filter {
+  min-width: 220px;
+}
+
+.activity-card-grid {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.activity-card {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+
+.activity-card h2 {
+  font-size: 1.35rem;
+}
+
+.activity-card p {
+  margin: 0;
+}
+
+.activity-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.instruction-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+  display: grid;
+  gap: 0.25rem;
+}
+
+.checklist {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.checklist-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.checklist-item span {
+  color: var(--warning);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.checklist-done span {
+  color: var(--success);
+}
+
+.settings-status-grid,
+.feature-grid {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.feature-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.feature-grid p {
+  margin-bottom: 0;
+}
+
 .danger-zone {
   margin-top: 0.9rem;
   border: 1px solid color-mix(in srgb, var(--danger), transparent 45%);
@@ -723,13 +822,17 @@ td {
 
   .probability-grid,
   .report-meta-grid,
-  .admin-stats-grid {
+  .admin-stats-grid,
+  .activity-card-grid,
+  .settings-status-grid,
+  .feature-grid {
     grid-template-columns: 1fr;
   }
 
   .report-action-card,
   .settings-row,
   .admin-header-row,
+  .quick-actions-card,
   .admin-resource-row {
     flex-direction: column;
     align-items: flex-start;

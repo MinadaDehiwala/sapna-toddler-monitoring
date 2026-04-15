@@ -21,10 +21,19 @@ const predictionSourceLabels = {
   rules_fallback: 'Rules Fallback'
 };
 
+const domainLabels = {
+  cognitive: 'Cognitive',
+  motor: 'Motor',
+  language: 'Language',
+  social_emotional: 'Social-emotional'
+};
+
 const baseTabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'children', label: 'Children' },
+  { id: 'activities', label: 'Activities' },
   { id: 'reports', label: 'Reports' },
+  { id: 'insights', label: 'Insights' },
   { id: 'profile', label: 'Profile' },
   { id: 'settings', label: 'Settings' },
   { id: 'about', label: 'About' }
@@ -43,8 +52,15 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString();
 }
 
+function formatDateInput(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString().slice(0, 10);
+}
+
 export default function DashboardPage() {
-  const { user, logout, deleteCurrentUser } = useAuth();
+  const { user, logout, deleteCurrentUser, resetPassword } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('overview');
   const [pending, setPending] = useState(false);
@@ -66,6 +82,8 @@ export default function DashboardPage() {
   const [reports, setReports] = useState([]);
   const [mlHealth, setMlHealth] = useState(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [activityDomainFilter, setActivityDomainFilter] = useState('all');
+  const [childDeleteConfirmation, setChildDeleteConfirmation] = useState('');
 
   const [adminSummary, setAdminSummary] = useState(null);
   const [adminParents, setAdminParents] = useState([]);
@@ -75,6 +93,7 @@ export default function DashboardPage() {
   const [adminConfirmation, setAdminConfirmation] = useState('');
 
   const [childForm, setChildForm] = useState({ nickname: '', dateOfBirth: '', sex: '' });
+  const [childEditForm, setChildEditForm] = useState({ nickname: '', dateOfBirth: '', sex: '' });
   const [logForm, setLogForm] = useState({
     activityId: '',
     durationMinutes: 10,
@@ -93,6 +112,34 @@ export default function DashboardPage() {
     !consent?.hasAcceptedConsent ||
     !consent?.acknowledgedScreeningOnly ||
     !consent?.acknowledgedDataUse;
+  const filteredActivities = useMemo(() => {
+    if (activityDomainFilter === 'all') return activities;
+    return activities.filter((activity) => activity.domain === activityDomainFilter);
+  }, [activities, activityDomainFilter]);
+  const strongestDomain = useMemo(() => {
+    const totals = dashboard?.stats?.domainTotals || {};
+    return Object.entries(totals).sort((a, b) => b[1] - a[1])[0] || null;
+  }, [dashboard]);
+  const focusDomain = useMemo(() => {
+    const totals = dashboard?.stats?.domainTotals || {};
+    return Object.entries(totals).sort((a, b) => a[1] - b[1])[0] || null;
+  }, [dashboard]);
+  const successTotal = useMemo(() => {
+    const counts = dashboard?.stats?.successCounts || {};
+    return Object.values(counts).reduce((sum, value) => sum + Number(value || 0), 0);
+  }, [dashboard]);
+  const masteryRate = useMemo(() => {
+    if (!successTotal) return 0;
+    const counts = dashboard?.stats?.successCounts || {};
+    return Math.round((((counts.completed || 0) + (counts.mastered || 0)) / successTotal) * 100);
+  }, [dashboard, successTotal]);
+  const readinessScore = useMemo(() => {
+    const logScore = Math.min((dashboard?.stats?.logsLast30Days || 0) * 5, 40);
+    const domainCoverage =
+      Object.values(dashboard?.stats?.domainTotals || {}).filter((value) => Number(value) > 0).length * 10;
+    const reportScore = dashboard?.latestReport ? 20 : 0;
+    return Math.min(100, Math.round(logScore + domainCoverage + reportScore));
+  }, [dashboard]);
 
   async function getToken() {
     return user.getIdToken();
@@ -211,6 +258,21 @@ export default function DashboardPage() {
   }, [selectedChildId]);
 
   useEffect(() => {
+    if (!selectedChild) {
+      setChildEditForm({ nickname: '', dateOfBirth: '', sex: '' });
+      setChildDeleteConfirmation('');
+      return;
+    }
+
+    setChildEditForm({
+      nickname: selectedChild.nickname || '',
+      dateOfBirth: formatDateInput(selectedChild.dateOfBirth),
+      sex: selectedChild.sex || ''
+    });
+    setChildDeleteConfirmation('');
+  }, [selectedChild]);
+
+  useEffect(() => {
     if (isAdmin && activeTab === 'admin') {
       loadAdminData();
     }
@@ -277,6 +339,60 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleUpdateChild(event) {
+    event.preventDefault();
+    if (!selectedChildId) {
+      setError('Select a child profile first.');
+      return;
+    }
+
+    setPending(true);
+    setError('');
+    setActionMessage('');
+    try {
+      await callApi(`/children/${selectedChildId}`, { method: 'PATCH', body: childEditForm });
+      await loadBaseData();
+      await loadChildData(selectedChildId);
+      setActionMessage('Child profile updated.');
+    } catch (childError) {
+      setError(childError.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleDeleteChild() {
+    if (!selectedChildId) {
+      setError('Select a child profile first.');
+      return;
+    }
+
+    setPending(true);
+    setError('');
+    setActionMessage('');
+    try {
+      await callApi(`/children/${selectedChildId}`, {
+        method: 'DELETE',
+        body: { confirmationText: childDeleteConfirmation }
+      });
+      const remainingChildren = children.filter((child) => child._id !== selectedChildId);
+      setSelectedChildId(remainingChildren[0]?._id || '');
+      setChildDeleteConfirmation('');
+      await loadBaseData();
+      setActionMessage('Child profile and related app data deleted.');
+    } catch (childError) {
+      setError(childError.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function handlePlanActivity(activity) {
+    setLogForm((prev) => ({ ...prev, activityId: activity._id, durationMinutes: activity.estimatedMinutes || prev.durationMinutes }));
+    setActiveTab('children');
+    setActionMessage(`Activity "${activity.title}" selected for the next log.`);
+  }
+
   async function handleCreateLog(event) {
     event.preventDefault();
     if (!selectedChildId) {
@@ -303,6 +419,27 @@ export default function DashboardPage() {
       setLogForm((prev) => ({ ...prev, notes: '' }));
       setActionMessage('Activity log saved.');
       await loadChildData(selectedChildId);
+    } catch (logError) {
+      setError(logError.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleDeleteLog(logId) {
+    const typed = window.prompt('Type DELETE LOG to remove this activity log.');
+    if (typed !== 'DELETE LOG') {
+      setError('Confirmation text mismatch. Enter exactly: DELETE LOG');
+      return;
+    }
+
+    setPending(true);
+    setError('');
+    setActionMessage('');
+    try {
+      await callApi(`/logs/${logId}`, { method: 'DELETE', body: { confirmationText: 'DELETE LOG' } });
+      await loadChildData(selectedChildId);
+      setActionMessage('Activity log deleted.');
     } catch (logError) {
       setError(logError.message);
     } finally {
@@ -376,6 +513,20 @@ export default function DashboardPage() {
       await logout();
     } catch (deleteError) {
       setError(deleteError.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handlePasswordReset() {
+    setPending(true);
+    setError('');
+    setActionMessage('');
+    try {
+      await resetPassword(profile?.email || user?.email);
+      setActionMessage('Password reset email sent.');
+    } catch (passwordError) {
+      setError(passwordError.message);
     } finally {
       setPending(false);
     }
@@ -573,6 +724,27 @@ export default function DashboardPage() {
         </section>
         {renderMlStatusCard()}
         {renderConsentCard()}
+        <section className="card quick-actions-card">
+          <div>
+            <p className="eyebrow">Today&apos;s Workspace</p>
+            <h2>Keep the workflow focused</h2>
+            <p>Jump directly into the task you need instead of scrolling through the whole product.</p>
+          </div>
+          <div className="quick-actions">
+            <button className="secondary-btn" type="button" onClick={() => setActiveTab('activities')}>
+              Browse Activities
+            </button>
+            <button className="secondary-btn" type="button" onClick={() => setActiveTab('children')}>
+              Log Activity
+            </button>
+            <button className="secondary-btn" type="button" onClick={() => setActiveTab('reports')}>
+              Generate Report
+            </button>
+            <button className="secondary-btn" type="button" onClick={() => setActiveTab('insights')}>
+              View Insights
+            </button>
+          </div>
+        </section>
         <section className="grid two-col">
           <article className="card">
             <p className="eyebrow">Selected Child</p>
@@ -706,6 +878,67 @@ export default function DashboardPage() {
         </article>
 
         <article className="card">
+          <h2>Manage Selected Child</h2>
+          {!selectedChild && <p>Select or create a child profile to edit details.</p>}
+          {selectedChild && (
+            <>
+              <form className="form-grid" onSubmit={handleUpdateChild}>
+                <label>
+                  Nickname
+                  <input
+                    value={childEditForm.nickname}
+                    onChange={(event) => setChildEditForm((prev) => ({ ...prev, nickname: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Date of Birth
+                  <input
+                    type="date"
+                    value={childEditForm.dateOfBirth}
+                    onChange={(event) => setChildEditForm((prev) => ({ ...prev, dateOfBirth: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Sex (Optional)
+                  <select
+                    value={childEditForm.sex}
+                    onChange={(event) => setChildEditForm((prev) => ({ ...prev, sex: event.target.value }))}
+                  >
+                    <option value="">Prefer not to say</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <button className="primary-btn" type="submit" disabled={pending}>
+                  Update Child Profile
+                </button>
+              </form>
+              <div className="danger-zone">
+                <label>
+                  Type <strong>DELETE CHILD DATA</strong> to remove this child&apos;s profile, logs, and reports
+                  <input
+                    value={childDeleteConfirmation}
+                    onChange={(event) => setChildDeleteConfirmation(event.target.value)}
+                    placeholder="DELETE CHILD DATA"
+                  />
+                </label>
+                <button
+                  className="danger-btn"
+                  type="button"
+                  onClick={handleDeleteChild}
+                  disabled={pending || childDeleteConfirmation !== 'DELETE CHILD DATA'}
+                >
+                  Delete Child Data
+                </button>
+              </div>
+            </>
+          )}
+        </article>
+
+        <article className="card">
           <h2>Log Offline Activity</h2>
           {renderConsentCard()}
           <form className="form-grid" onSubmit={handleCreateLog}>
@@ -788,6 +1021,7 @@ export default function DashboardPage() {
                     <th>Success</th>
                     <th>Minutes</th>
                     <th>Confidence</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -799,6 +1033,11 @@ export default function DashboardPage() {
                       <td>{log.successLevel.replace('_', ' ')}</td>
                       <td>{log.durationMinutes}</td>
                       <td>{log.parentConfidence}</td>
+                      <td>
+                        <button className="danger-link" type="button" onClick={() => handleDeleteLog(log._id)}>
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -806,6 +1045,73 @@ export default function DashboardPage() {
             </div>
           )}
         </article>
+      </div>
+    );
+  }
+
+  function renderActivitiesTab() {
+    return (
+      <div className="tab-panel">
+        <section className="card report-action-card">
+          <div>
+            <p className="eyebrow">Guided Activity Library</p>
+            <h2>{selectedChild ? `Activities for ${selectedChild.nickname}` : 'Select a child to personalize activities'}</h2>
+            <p>
+              Activities are filtered to the child&apos;s age band and stay offline-first so parents guide the interaction.
+            </p>
+          </div>
+          <label className="compact-filter">
+            Domain
+            <select value={activityDomainFilter} onChange={(event) => setActivityDomainFilter(event.target.value)}>
+              <option value="all">All domains</option>
+              {Object.entries(domainLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+
+        <section className="activity-card-grid">
+          {!selectedChild && (
+            <article className="card">
+              <h2>No child selected</h2>
+              <p>Create or select a child in the Children tab to see age-appropriate activities.</p>
+            </article>
+          )}
+          {selectedChild && filteredActivities.length === 0 && (
+            <article className="card">
+              <h2>No matching activities</h2>
+              <p>Try another domain filter or check that seeded activities are available.</p>
+            </article>
+          )}
+          {selectedChild &&
+            filteredActivities.map((activity) => (
+              <article className="card activity-card" key={activity._id}>
+                <div className="report-header-row">
+                  <span className="source-badge source-ml">{domainLabels[activity.domain] || activity.domain}</span>
+                  <span className="ml-version-text">{activity.ageBandMinMonths}-{activity.ageBandMaxMonths} months</span>
+                </div>
+                <h2>{activity.title}</h2>
+                <p>{activity.description}</p>
+                <div className="activity-meta-row">
+                  <span>{activity.estimatedMinutes} min</span>
+                  <span>{activity.instructions?.length || 0} steps</span>
+                </div>
+                {activity.instructions?.length > 0 && (
+                  <ol className="instruction-list">
+                    {activity.instructions.map((instruction) => (
+                      <li key={instruction}>{instruction}</li>
+                    ))}
+                  </ol>
+                )}
+                <button className="secondary-btn" type="button" onClick={() => handlePlanActivity(activity)}>
+                  Plan This Activity
+                </button>
+              </article>
+            ))}
+        </section>
       </div>
     );
   }
@@ -841,6 +1147,98 @@ export default function DashboardPage() {
     );
   }
 
+  function renderInsightsTab() {
+    const checklist = [
+      {
+        label: 'At least 4 logs in the last 30 days',
+        done: (dashboard?.stats?.logsLast30Days || 0) >= 4
+      },
+      {
+        label: 'All four developmental domains have activity',
+        done: Object.values(dashboard?.stats?.domainTotals || {}).filter((value) => Number(value) > 0).length === 4
+      },
+      {
+        label: 'Latest weekly report generated',
+        done: Boolean(dashboard?.latestReport)
+      },
+      {
+        label: 'Consent and data-use acknowledgments complete',
+        done: !requiresConsent
+      }
+    ];
+
+    return (
+      <div className="tab-panel grid two-col">
+        <article className="card">
+          <p className="eyebrow">Readiness Score</p>
+          <h2>{readinessScore}%</h2>
+          <p>
+            A lightweight quality score based on logging consistency, domain coverage, report freshness, and consent completeness.
+          </p>
+          <progress max="100" value={readinessScore} />
+        </article>
+        <article className="card">
+          <p className="eyebrow">Success Mix</p>
+          <h2>{masteryRate}% completed/mastered</h2>
+          <p>Calculated from the selected child&apos;s last 30 days of parent logs.</p>
+          <div className="probability-grid">
+            {Object.entries(dashboard?.stats?.successCounts || {}).map(([label, value]) => (
+              <div className="probability-item" key={label}>
+                <span>{label.replace('_', ' ')}</span>
+                <strong>{value}</strong>
+              </div>
+            ))}
+          </div>
+        </article>
+        <article className="card">
+          <h2>Domain Coverage</h2>
+          <p>
+            Strongest domain: <strong>{strongestDomain ? domainLabels[strongestDomain[0]] : 'N/A'}</strong>
+          </p>
+          <p>
+            Next focus: <strong>{focusDomain ? domainLabels[focusDomain[0]] : 'N/A'}</strong>
+          </p>
+          <div className="domain-bars">
+            {Object.entries(dashboard?.stats?.domainTotals || {}).map(([domain, value]) => (
+              <div key={domain}>
+                <div className="domain-row">
+                  <span>{domainLabels[domain] || domain}</span>
+                  <span>{value}</span>
+                </div>
+                <progress max="20" value={Math.min(value, 20)} />
+              </div>
+            ))}
+          </div>
+        </article>
+        <article className="card">
+          <h2>Quality Checklist</h2>
+          <div className="checklist">
+            {checklist.map((item) => (
+              <div className={`checklist-item ${item.done ? 'checklist-done' : ''}`} key={item.label}>
+                <span>{item.done ? 'Done' : 'Todo'}</span>
+                <strong>{item.label}</strong>
+              </div>
+            ))}
+          </div>
+        </article>
+        <article className="card wide-card">
+          <h2>Recommended Next Actions</h2>
+          <div className="next-action-grid">
+            <button className="secondary-btn" type="button" onClick={() => setActiveTab('activities')}>
+              Pick a {focusDomain ? domainLabels[focusDomain[0]] : 'guided'} activity
+            </button>
+            <button className="secondary-btn" type="button" onClick={() => setActiveTab('children')}>
+              Add today&apos;s observation
+            </button>
+            <button className="secondary-btn" type="button" onClick={() => setActiveTab('reports')}>
+              Refresh weekly report
+            </button>
+          </div>
+        </article>
+      </div>
+    );
+  }
+
   function renderProfileTab() {
     return (
       <div className="tab-panel grid two-col">
@@ -866,6 +1264,37 @@ export default function DashboardPage() {
           <p><strong>Consent:</strong> {consent?.hasAcceptedConsent ? 'Accepted' : 'Not accepted'}</p>
           <p><strong>Joined:</strong> {formatDate(profile?.createdAt)}</p>
         </article>
+        <article className="card">
+          <h2>Profile Snapshot</h2>
+          <div className="stats-grid">
+            <div className="stat-box">
+              <span>Children</span>
+              <strong>{children.length}</strong>
+            </div>
+            <div className="stat-box">
+              <span>Total Reports</span>
+              <strong>{reports.length}</strong>
+            </div>
+            <div className="stat-box">
+              <span>Recent Logs</span>
+              <strong>{dashboard?.stats?.logsLast30Days || 0}</strong>
+            </div>
+            <div className="stat-box">
+              <span>Readiness</span>
+              <strong>{readinessScore}%</strong>
+            </div>
+          </div>
+        </article>
+        <article className="card">
+          <h2>Child Roster</h2>
+          {children.length === 0 && <p>No children have been added yet.</p>}
+          {children.map((child) => (
+            <div className="mini-list-item" key={child._id}>
+              <strong>{child.nickname}</strong>
+              <span>{child.ageInMonths} months - {child.sex || 'sex not specified'}</span>
+            </div>
+          ))}
+        </article>
       </div>
     );
   }
@@ -882,6 +1311,15 @@ export default function DashboardPage() {
             </div>
             <button className="theme-toggle-btn" type="button" onClick={toggleTheme}>
               {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            </button>
+          </div>
+          <div className="settings-row">
+            <div>
+              <strong>Password</strong>
+              <p>Send a Firebase password reset email to {profile?.email || user?.email}.</p>
+            </div>
+            <button className="secondary-btn" type="button" onClick={handlePasswordReset} disabled={pending}>
+              Send Reset Email
             </button>
           </div>
           {renderMlStatusCard()}
@@ -920,6 +1358,27 @@ export default function DashboardPage() {
           {dashboard?.medicalDisclaimer ||
             'This tool supports developmental screening and monitoring only. It does not provide a medical diagnosis.'}
         </article>
+        <article className="card wide-card">
+          <h2>Operational Status</h2>
+          <div className="settings-status-grid">
+            <div className="stat-box">
+              <span>API</span>
+              <strong>{mlHealth?.ok ? 'Online' : 'Checking'}</strong>
+            </div>
+            <div className="stat-box">
+              <span>MongoDB</span>
+              <strong>{mlHealth?.mongoState || 'N/A'}</strong>
+            </div>
+            <div className="stat-box">
+              <span>Firebase</span>
+              <strong>{mlHealth?.firebaseConfigured ? 'Configured' : 'Unavailable'}</strong>
+            </div>
+            <div className="stat-box">
+              <span>ML</span>
+              <strong>{mlHealth?.mlServiceReachable ? 'Online' : 'Fallback'}</strong>
+            </div>
+          </div>
+        </article>
       </div>
     );
   }
@@ -952,6 +1411,27 @@ export default function DashboardPage() {
           <p>
             Data is tied to the authenticated parent account, consent is required before logging, and parents can export or delete app data from Settings.
           </p>
+        </article>
+        <article className="card wide-card">
+          <h2>Quality &amp; Safety Features</h2>
+          <div className="feature-grid">
+            <div>
+              <strong>Domain isolation</strong>
+              <p>SAPNA runs as its own frontend, backend process, and ML sidecar without sharing routes with other sites.</p>
+            </div>
+            <div>
+              <strong>Resilient reports</strong>
+              <p>Weekly reports fall back to rules if the ML service is unavailable or below confidence threshold.</p>
+            </div>
+            <div>
+              <strong>Data ownership</strong>
+              <p>Parents can export or delete their SAPNA app data from Settings at any time.</p>
+            </div>
+            <div>
+              <strong>Audit-friendly consent</strong>
+              <p>Consent records include screening-only and data-use acknowledgments with a versioned policy.</p>
+            </div>
+          </div>
         </article>
       </div>
     );
@@ -1110,7 +1590,9 @@ export default function DashboardPage() {
 
   function renderActiveTab() {
     if (activeTab === 'children') return renderChildrenTab();
+    if (activeTab === 'activities') return renderActivitiesTab();
     if (activeTab === 'reports') return renderReportsTab();
+    if (activeTab === 'insights') return renderInsightsTab();
     if (activeTab === 'profile') return renderProfileTab();
     if (activeTab === 'settings') return renderSettingsTab();
     if (activeTab === 'about') return renderAboutTab();

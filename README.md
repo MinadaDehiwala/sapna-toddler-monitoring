@@ -47,14 +47,17 @@ flowchart LR
 - Parent account onboarding and profile bootstrap
 - Consent capture with versioning and timestamp
 - Child profiles with minimal PII (nickname, DOB, optional sex)
+- Parent-side child profile edit/delete with confirmation-protected app-data cleanup
 - Soft warning outside the 12-36 month target band
-- Guided physical/offline activity catalog
+- Guided physical/offline activity catalog with age/domain filters
 - Activity logging:
   - duration
   - success level
   - parent confidence
   - notes
+- Parent-side activity log deletion with confirmation protection
 - Dashboard analytics over recent logs
+- Insights workspace with readiness score, domain coverage, success mix, and quality checklist
 - Weekly report generation:
   - status classification (`on_track`, `needs_monitoring`, `at_risk`)
   - prediction source badge (`ML` or `Rules Fallback`)
@@ -66,8 +69,9 @@ flowchart LR
 - Privacy APIs:
   - `GET /api/privacy/export`
   - `DELETE /api/privacy/account` with `confirmationText: "DELETE MY DATA"`
+- Firebase password reset from Settings
 - Tabbed product workspace:
-  - Overview, Children, Reports, Profile, Settings, About, Admin
+  - Overview, Children, Activities, Reports, Insights, Profile, Settings, About, Admin
 - Mongo-backed admin roles:
   - `parent` default role
   - `admin` privileged role for SAPNA app-data management

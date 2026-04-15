@@ -9,6 +9,7 @@ const apiRequestMock = vi.fn();
 const toggleThemeMock = vi.fn();
 const logoutMock = vi.fn(async () => {});
 const deleteCurrentUserMock = vi.fn(async () => true);
+const resetPasswordMock = vi.fn(async () => {});
 
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => mockAuthState
@@ -41,7 +42,9 @@ function buildDashboardApiMock({ consentAccepted, role = 'parent' }) {
       {
         _id: 'child-1',
         nickname: 'Ari',
-        ageInMonths: 24
+        dateOfBirth: '2024-04-01T00:00:00.000Z',
+        ageInMonths: 24,
+        sex: 'other'
       }
     ],
     logs: [
@@ -132,13 +135,25 @@ function buildDashboardApiMock({ consentAccepted, role = 'parent' }) {
         }
       };
     }
+    if (path === '/children/child-1' && method === 'PATCH') {
+      state.children[0] = { ...state.children[0], nickname: 'Ari Updated' };
+      return { child: state.children[0] };
+    }
+    if (path === '/children/child-1' && method === 'DELETE') {
+      return { deleted: true, deletedAt: new Date().toISOString() };
+    }
     if (path.startsWith('/activities')) {
       return {
         activities: [
           {
             _id: 'activity-1',
             title: 'Stack blocks',
-            domain: 'motor'
+            description: 'Practice stacking two safe blocks.',
+            domain: 'motor',
+            ageBandMinMonths: 24,
+            ageBandMaxMonths: 29,
+            estimatedMinutes: 10,
+            instructions: ['Show the blocks.', 'Invite the child to stack.', 'Praise attempts.']
           }
         ]
       };
@@ -148,6 +163,9 @@ function buildDashboardApiMock({ consentAccepted, role = 'parent' }) {
     }
     if (path === '/logs' && method === 'POST') {
       return { log: { _id: 'log-new' } };
+    }
+    if (path === '/logs/log-1' && method === 'DELETE') {
+      return { deleted: true, deletedAt: new Date().toISOString() };
     }
     if (path.startsWith('/dashboard/')) {
       return {
@@ -159,6 +177,12 @@ function buildDashboardApiMock({ consentAccepted, role = 'parent' }) {
             motor: 1,
             language: 0,
             social_emotional: 0
+          },
+          successCounts: {
+            needs_help: 0,
+            partial: 1,
+            completed: 1,
+            mastered: 0
           }
         },
         latestReport: state.reports[0],
@@ -236,6 +260,7 @@ describe('frontend smoke flows', () => {
       user: { email: 'main@example.com', getIdToken: vi.fn(async () => 'token-main') },
       logout: logoutMock,
       deleteCurrentUser: deleteCurrentUserMock,
+      resetPassword: resetPasswordMock,
       login: vi.fn(),
       signup: vi.fn(),
       configError: ''
@@ -244,6 +269,7 @@ describe('frontend smoke flows', () => {
     toggleThemeMock.mockReset();
     logoutMock.mockClear();
     deleteCurrentUserMock.mockClear();
+    resetPasswordMock.mockClear();
 
     if (!URL.createObjectURL) {
       URL.createObjectURL = () => 'blob:test';
@@ -273,7 +299,9 @@ describe('frontend smoke flows', () => {
 
     expect(await screen.findByRole('button', { name: /^Overview$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Children$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Activities$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Reports$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Insights$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Profile$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Settings$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^About$/i })).toBeInTheDocument();
@@ -310,17 +338,42 @@ describe('frontend smoke flows', () => {
       screen.getAllByText(/Language-focused activities appear below the expected range for this age./i).length
     ).toBeGreaterThan(0);
 
+    await openTab(/^Activities$/i);
+    expect(await screen.findByText(/Guided Activity Library/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Plan This Activity/i }));
+
     await openTab(/^Children$/i);
-    await userEvent.type(screen.getByLabelText(/Nickname/i), 'Nia');
-    await userEvent.type(screen.getByLabelText(/Date of Birth/i), '2024-06-01');
+    await userEvent.type(screen.getAllByLabelText(/Nickname/i)[0], 'Nia');
+    await userEvent.type(screen.getAllByLabelText(/Date of Birth/i)[0], '2024-06-01');
     await userEvent.click(screen.getByRole('button', { name: /Save Child Profile/i }));
+
+    await userEvent.clear(screen.getAllByLabelText(/Nickname/i)[1]);
+    await userEvent.type(screen.getAllByLabelText(/Nickname/i)[1], 'Ari Updated');
+    await userEvent.click(screen.getByRole('button', { name: /Update Child Profile/i }));
+    await waitFor(() => {
+      expect(apiRequestMock).toHaveBeenCalledWith(
+        '/children/child-1',
+        expect.objectContaining({ method: 'PATCH' })
+      );
+    });
 
     await userEvent.clear(screen.getByLabelText(/Logged Duration \(minutes\)/i));
     await userEvent.type(screen.getByLabelText(/Logged Duration \(minutes\)/i), '15');
     await userEvent.click(screen.getByRole('button', { name: /Save Activity Log/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Delete$/i }));
+    await waitFor(() => {
+      expect(apiRequestMock).toHaveBeenCalledWith(
+        '/logs/log-1',
+        expect.objectContaining({ method: 'DELETE', body: { confirmationText: 'DELETE LOG' } })
+      );
+    });
 
     await openTab(/^Reports$/i);
     await userEvent.click(screen.getByRole('button', { name: /Generate Weekly Report/i }));
+
+    await openTab(/^Insights$/i);
+    expect(screen.getByText(/Readiness Score/i)).toBeInTheDocument();
+    expect(screen.getByText(/Quality Checklist/i)).toBeInTheDocument();
 
     await openTab(/^Profile$/i);
     await userEvent.clear(screen.getByLabelText(/Display Name/i));
@@ -328,6 +381,8 @@ describe('frontend smoke flows', () => {
     await userEvent.click(screen.getByRole('button', { name: /Save Profile/i }));
 
     await openTab(/^Settings$/i);
+    await userEvent.click(screen.getByRole('button', { name: /Send Reset Email/i }));
+    expect(resetPasswordMock).toHaveBeenCalledWith('main@example.com');
     await userEvent.click(screen.getByRole('button', { name: /Export My Data/i }));
     await waitFor(() => {
       expect(apiRequestMock).toHaveBeenCalledWith(

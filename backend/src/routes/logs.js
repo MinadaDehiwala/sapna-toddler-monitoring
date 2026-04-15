@@ -85,4 +85,24 @@ router.get(
   })
 );
 
+router.delete(
+  '/:logId',
+  asyncHandler(async (req, res) => {
+    if (req.body?.confirmationText !== 'DELETE LOG') {
+      throw createError(400, 'Confirmation text mismatch. Enter exactly: DELETE LOG');
+    }
+
+    const result = await ActivityLog.deleteOne({
+      _id: req.params.logId,
+      parentId: req.user.parent._id
+    });
+
+    if (!result.deletedCount) {
+      throw createError(404, 'Log not found for this parent.');
+    }
+
+    res.json({ deleted: true, deletedAt: new Date().toISOString() });
+  })
+);
+
 module.exports = router;

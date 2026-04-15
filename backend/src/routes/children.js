@@ -1,6 +1,8 @@
 const express = require('express');
 const createError = require('http-errors');
 const Child = require('../models/Child');
+const ActivityLog = require('../models/ActivityLog');
+const WeeklyReport = require('../models/WeeklyReport');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { calculateAgeInMonths, getAgeWarning } = require('../utils/age');
 
@@ -75,6 +77,37 @@ router.patch(
 
     await child.save();
     res.json({ child: formatChild(child) });
+  })
+);
+
+router.delete(
+  '/:childId',
+  asyncHandler(async (req, res) => {
+    if (req.body?.confirmationText !== 'DELETE CHILD DATA') {
+      throw createError(400, 'Confirmation text mismatch. Enter exactly: DELETE CHILD DATA');
+    }
+
+    const child = await Child.findOne({ _id: req.params.childId, parentId: req.user.parent._id });
+
+    if (!child) {
+      throw createError(404, 'Child not found for this parent.');
+    }
+
+    const [reports, logs] = await Promise.all([
+      WeeklyReport.deleteMany({ childId: child._id, parentId: req.user.parent._id }),
+      ActivityLog.deleteMany({ childId: child._id, parentId: req.user.parent._id })
+    ]);
+    await Child.deleteOne({ _id: child._id, parentId: req.user.parent._id });
+
+    res.json({
+      deleted: true,
+      deletedAt: new Date().toISOString(),
+      deletedCounts: {
+        children: 1,
+        logs: logs.deletedCount,
+        reports: reports.deletedCount
+      }
+    });
   })
 );
 
